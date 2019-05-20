@@ -1,5 +1,6 @@
 from layers import GraphConvolution, InnerProductDecoder
 import tensorflow as tf
+import math
 
 class Model(object):
     def __init__(self, **kwargs):
@@ -57,7 +58,7 @@ class GCNModelVAE(Model):
                                        input_dim=args.hidden_dim_1,
                                        output_dim=args.hidden_dim_2,
                                        adj=self.adj,
-                                       act=lambda x: x,
+                                       act=tf.nn.relu,
                                        dropout=self.dropout,
                                        logging=self.logging)(self.hidden1)
 
@@ -65,11 +66,12 @@ class GCNModelVAE(Model):
                                           input_dim=args.hidden_dim_1,
                                           output_dim=args.hidden_dim_2,
                                           adj=self.adj,
-                                          act=lambda x: x,
+                                          act=tf.nn.relu,
                                           dropout=self.dropout,
                                           logging=self.logging)(self.hidden1)
 
-        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2]) * tf.exp(self.z_log_std)
+        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2]) * tf.exp(tf.clip_by_value(self.z_log_std, -1., 1.))
+        # self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2])
 
         self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
                                       act=lambda x: x,

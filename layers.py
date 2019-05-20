@@ -56,8 +56,6 @@ class GraphConvolution(Layer):
         with tf.variable_scope(self.name + '_vars'):
             self.vars['weights'] = weight_variable_glorot(batch_size, input_dim,
             output_dim, name="weights")
-            print("WEIGHTS")
-            print(self.vars['weights'].shape)
         self.dropout = dropout
         self.adj = adj
         self.act = act
@@ -71,7 +69,6 @@ class GraphConvolution(Layer):
         return outputs
 
 class InnerProductDecoder(Layer):
-    """Decoder model layer for link prediction."""
     def __init__(self, input_dim, dropout=0., act=tf.nn.sigmoid, **kwargs):
         super(InnerProductDecoder, self).__init__(**kwargs)
         self.dropout = dropout
