@@ -33,6 +33,84 @@ class Model(object):
     def predict(self):
         pass
 
+class GCNModelAE(Model):
+    def __init__(self, placeholders, num_features, num_nodes, args, **kwargs):
+        super(GCNModelAE, self).__init__(**kwargs)
+
+        self.inputs = placeholders['features']
+        self.batch_size = args.batch_size
+        self.input_dim = num_features
+        self.n_samples = num_nodes
+        self.adj = placeholders['adj_orig']
+        self.dropout = placeholders['dropout']
+        self.build(args)
+
+    def _build(self, args):
+        self.hidden1 = GraphConvolution(batch_size=self.batch_size,
+                                              input_dim=self.input_dim,
+                                              output_dim=args.hidden_dim_1,
+                                              adj=self.adj,
+                                              act=tf.nn.relu,
+                                              dropout=self.dropout,
+                                              logging=self.logging)(self.inputs)
+
+        self.z_mean = GraphConvolution(batch_size=self.batch_size,
+                                       input_dim=args.hidden_dim_1,
+                                       output_dim=args.hidden_dim_2,
+                                       adj=self.adj,
+                                       act=lambda x: x,
+                                       dropout=self.dropout,
+                                       logging=self.logging)(self.hidden1)
+        self.z = self.z_mean 
+
+        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
+                                      act=lambda x: x,
+                                      logging=self.logging)(self.z)
+
+class GCNModelVAE(Model):
+    def __init__(self, placeholders, num_features, num_nodes, args, **kwargs):
+        super(GCNModelVAE, self).__init__(**kwargs)
+
+        self.inputs = placeholders['features']
+        self.batch_size = args.batch_size
+        self.input_dim = num_features
+        self.n_samples = num_nodes
+        self.adj = placeholders['adj_orig']
+        self.dropout = placeholders['dropout']
+        self.build(args)
+
+    def _build(self, args):
+        self.hidden1 = GraphConvolution(batch_size=self.batch_size,
+                                              input_dim=self.input_dim,
+                                              output_dim=args.hidden_dim_1,
+                                              adj=self.adj,
+                                              act=tf.nn.relu,
+                                              dropout=self.dropout,
+                                              logging=self.logging)(self.inputs)
+
+        self.z_mean = GraphConvolution(batch_size=self.batch_size,
+                                       input_dim=args.hidden_dim_1,
+                                       output_dim=args.hidden_dim_2,
+                                       adj=self.adj,
+                                       act=lambda x: x,
+                                       dropout=self.dropout,
+                                       logging=self.logging)(self.hidden1)
+
+        self.z_log_std = GraphConvolution(batch_size=self.batch_size,
+                                          input_dim=args.hidden_dim_1,
+                                          output_dim=args.hidden_dim_2,
+                                          adj=self.adj,
+                                          act=lambda x: x,
+                                          dropout=self.dropout,
+                                          logging=self.logging)(self.hidden1)
+
+        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2]) * tf.exp(tf.clip_by_value(self.z_log_std, float("-inf"), 5.))
+#         self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2])
+
+        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
+                                      act=lambda x: x,
+                                      logging=self.logging)(self.z)
+
 class GCNModelVAE(Model):
     def __init__(self, placeholders, num_features, num_nodes, args, **kwargs):
         super(GCNModelVAE, self).__init__(**kwargs)

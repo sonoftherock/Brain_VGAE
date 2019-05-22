@@ -1,0 +1,2 @@
+model_checkpoint_path: "brain_vgae_100_50_autoencoder=True.ckpt"
+all_model_checkpoint_paths: "brain_vgae_100_50_autoencoder=True.ckpt"
