@@ -58,7 +58,7 @@ class GCNModelVAE(Model):
                                        input_dim=args.hidden_dim_1,
                                        output_dim=args.hidden_dim_2,
                                        adj=self.adj,
-                                       act=tf.nn.relu,
+                                       act=lambda x: x,
                                        dropout=self.dropout,
                                        logging=self.logging)(self.hidden1)
 
@@ -66,12 +66,12 @@ class GCNModelVAE(Model):
                                           input_dim=args.hidden_dim_1,
                                           output_dim=args.hidden_dim_2,
                                           adj=self.adj,
-                                          act=tf.nn.relu,
+                                          act=lambda x: x,
                                           dropout=self.dropout,
                                           logging=self.logging)(self.hidden1)
 
-        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2]) * tf.exp(tf.clip_by_value(self.z_log_std, -1., 1.))
-        # self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2])
+        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2]) * tf.exp(tf.clip_by_value(self.z_log_std, float("-inf"), 5.))
+#         self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2])
 
         self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
                                       act=lambda x: x,

@@ -69,7 +69,7 @@ class GraphConvolution(Layer):
         return outputs
 
 class InnerProductDecoder(Layer):
-    def __init__(self, input_dim, dropout=0., act=tf.nn.sigmoid, **kwargs):
+    def __init__(self, input_dim, dropout=0., act=tf.nn.relu, **kwargs):
         super(InnerProductDecoder, self).__init__(**kwargs)
         self.dropout = dropout
         self.act = act

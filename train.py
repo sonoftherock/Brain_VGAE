@@ -18,7 +18,7 @@ from tensorflow.python import debug as tf_debug
 parser = argparse.ArgumentParser()
 parser.add_argument("data_dir", nargs='?', help="data directory", type=str, default="BSNIP_left_full/")
 parser.add_argument("learning_rate", nargs='?', type=float, default=0.0001)
-parser.add_argument("epochs", nargs='?', type=int, default=10000)
+parser.add_argument("epochs", nargs='?', type=int, default=50000)
 parser.add_argument("batch_size", nargs='?', type=int, default=32)
 parser.add_argument("hidden_dim_1", nargs='?', type=int, default=200)
 parser.add_argument("hidden_dim_2", nargs='?', type=int, default=100)
@@ -83,7 +83,7 @@ model = "../models/brain_vgae_200_100.ckpt"
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    # saver.restore(sess, model)
+#     saver.restore(sess, model)
     start_time = time.time()
     features_batch = np.zeros([args.batch_size, num_nodes, num_features], dtype=np.float32)
     for i in features_batch:
@@ -95,13 +95,13 @@ with tf.Session() as sess:
         features = features_batch
         feed_dict = construct_feed_dict(adj_norm, adj_orig, features, placeholders)
         feed_dict.update({placeholders['dropout']: args.dropout})
-        input, reconstruction = sess.run([opt.labels_sub , opt.preds_sub], feed_dict=feed_dict)
         outs = sess.run([opt.opt_op, opt.cost], feed_dict=feed_dict)
 
         # Compute average loss
         avg_cost = outs[1]
-        if epoch % 10 == 0:
+        if epoch % 100 == 0:
             print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(avg_cost),
               "time=", "{:.5f}".format(time.time() - t))
-    save_path = saver.save(sess, model)
+        if epoch % 1000 == 0:
+            save_path = saver.save(sess, model)
     print('done saving at',save_path)
