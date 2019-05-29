@@ -2,7 +2,7 @@ import tensorflow as tf
 
 
 class OptimizerVAE(object):
-    def __init__(self, preds, labels, model, num_nodes, learning_rate):
+    def __init__(self, preds, labels, model, num_nodes, learning_rate, kl_coefficient):
         self.preds_sub = preds
         self.labels_sub = labels
 #         self.cost = norm * tf.reduce_mean(tf.nn.weighted_cross_entropy_with_logits(logits=preds_sub, targets=labels_sub, pos_weight=pos_weight))
@@ -10,10 +10,9 @@ class OptimizerVAE(object):
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)  # Adam Optimizer
 
         # Latent loss
-        #self.log_lik = self.rc_loss
         self.kl = (0.5 / num_nodes) * tf.reduce_mean(tf.reduce_sum(1 + 2 * model.z_log_std - tf.square(model.z_mean) -
-                                                                   tf.square(tf.exp(tf.clip_by_value(model.z_log_std, float("-inf"), 5.))), 1))
-        self.cost = self.rc_loss - self.kl
+                                                                   tf.square(tf.exp(model.z_log_std)), 1))
+        self.cost = self.rc_loss - kl_coefficient * self.kl
 
         self.opt_op = self.optimizer.minimize(self.cost)
         self.grads_vars = self.optimizer.compute_gradients(self.cost)
@@ -26,7 +25,6 @@ class OptimizerAE(object):
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)  # Adam Optimizer
 
         # Latent loss
-        #self.log_lik = self.rc_loss
         self.cost = self.rc_loss 
         
         # Just to let train script run, doesn't do anything.

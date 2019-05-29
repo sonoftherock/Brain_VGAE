@@ -1,0 +1,1 @@
+average reconstruction loss: 0.009892

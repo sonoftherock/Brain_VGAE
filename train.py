@@ -3,7 +3,7 @@ import os
 import argparse
 
 # Using Tesla K80 on Yale CS cluster (tangra)
-os.environ['CUDA_VISIBLE_DEVICES'] = "0"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1"
 
 import tensorflow as tf
 import numpy as np
@@ -18,22 +18,30 @@ from tensorflow.python import debug as tf_debug
 parser = argparse.ArgumentParser()
 parser.add_argument("data_dir", nargs='?', help="data directory", type=str, default="BSNIP_left_full/")
 parser.add_argument("learning_rate", nargs='?', type=float, default=0.0001)
-parser.add_argument("epochs", nargs='?', type=int, default=100000)
+parser.add_argument("epochs", nargs='?', type=int, default=1000000)
 parser.add_argument("batch_size", nargs='?', type=int, default=32)
 parser.add_argument("hidden_dim_1", nargs='?', type=int, default=100)
 parser.add_argument("hidden_dim_2", nargs='?', type=int, default=50)
-parser.add_argument("hidden_dim_3", nargs='?', type=int, default=10)
+parser.add_argument("hidden_dim_3", nargs='?', type=int, default=5)
+parser.add_argument("--kl_coefficient", type=float, default=0.001)
 parser.add_argument("dropout", nargs='?', type=float, default=0.)
 parser.add_argument('--debug', help='turn on tf debugger', action="store_true")
 parser.add_argument('--autoencoder', help='train without KL loss', action="store_true")
+parser.add_argument('--restore', help='restore or train new model', action="store_true")
+parser.add_argument('--activation', help='activation function on decoder output', default='none')
 
 args = parser.parse_args()
 print("Learning Rate: " + str(args.learning_rate))
-print("Hidden dimensions: " + str(args.hidden_dim_1), " ", str(args.hidden_dim_2))
+print("Hidden dimensions: " + str(args.hidden_dim_1), str(args.hidden_dim_2), str(args.hidden_dim_3))
 
 # Load data
 # adj, features = load_data("./data/" + args.data_dir + "adj.npy", "./data/" + args.data_dir + "features.npy")
 adj = load_data("./data/" + args.data_dir + "original.npy")
+
+# Add self connection
+for sub in adj:
+    np.fill_diagonal(sub,1)
+
 print('LOADING DATA FROM: ' + "./data/" + args.data_dir + "original.npy")
 
 # Normalize adjacency matrix (i.e. D^(.5)AD^(.5))
@@ -46,9 +54,9 @@ num_features = adj.shape[1]
 
 # Define placeholders
 placeholders = {
-'features': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_features]),
-'adj_norm': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
-'adj_orig': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
+'features': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_features]),
+'adj_norm': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
+'adj_orig': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
 'dropout': tf.placeholder_with_default(0., shape=())
 }
 
@@ -71,15 +79,16 @@ with tf.name_scope('optimizer'):
         opt = OptimizerVAE(preds=model.reconstructions,
                            labels=tf.reshape(placeholders['adj_orig'], [-1]),
                            model=model, num_nodes=num_nodes,
-                           learning_rate=args.learning_rate)
+                           learning_rate=args.learning_rate,
+                           kl_coefficient=args.kl_coefficient)
 
 def get_next_batch(batch_size, adj, adj_norm):
-    adj_idx = np.random.randint(adj_norm.shape[0], size=batch_size)
+    adj_idx = np.random.randint(adj.shape[0], size=batch_size)
     adj_norm_batch = adj_norm[adj_idx, :, :]
     adj_norm_batch = np.reshape(adj_norm_batch, [batch_size, num_nodes, num_nodes])
     adj_orig_batch = adj[adj_idx, :, :]
     adj_orig_batch = np.reshape(adj_orig_batch, [batch_size, num_nodes, num_nodes])
-    return adj_norm_batch, adj_orig_batch
+    return adj_norm_batch, adj_orig_batch, adj_idx
 
 # Initialize session
 sess = tf.Session()
@@ -89,33 +98,35 @@ if args.debug:
 
 # Train model
 saver = tf.train.Saver()
-model_name = "./models/brain_vgae_" + str(args.hidden_dim_1) + "_" + str(args.hidden_dim_2) + "_" + "autoencoder=" + str(args.autoencoder) + ".ckpt"
+model_name = "./models/brain_vgae_" + str(args.hidden_dim_1) + "_" + str(args.hidden_dim_2) + "_" +str(args.hidden_dim_3) + "_" + "autoencoder=" + str(args.autoencoder) + "_kl_coefficient=" + str(args.kl_coefficient) + ".ckpt"
 print("Starting to train: " + model_name)
 
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    print("Restoring model from: ", model_name)
-    saver.restore(sess, model_name)
-    start_time = time.time()
+    if args.restore:
+        print("Restoring model from: ", model_name)
+        saver.restore(sess, model_name)
+        start_time = time.time()
 
     # feature-less
-    features_batch = np.zeros([args.batch_size, num_nodes, num_features], dtype=np.float32)
+    features_batch = np.zeros([args.batch_size, num_nodes, num_features], dtype=np.float64)
     for i in features_batch:
         np.fill_diagonal(i, 1.)
 
     for epoch in range(args.epochs):
         t = time.time()
-        adj_norm, adj_orig = get_next_batch(args.batch_size, adj, adj_norm)
-        features = features_batch
-        feed_dict = construct_feed_dict(adj_norm, adj_orig, features, placeholders)
+        adj_norm_batch, adj_orig_batch, adj_idx = get_next_batch(args.batch_size, adj, adj_norm)
+        feed_dict = construct_feed_dict(adj_norm_batch, adj_orig_batch, features_batch, placeholders)
         feed_dict.update({placeholders['dropout']: args.dropout})
-        outs = sess.run([opt.opt_op, opt.cost, opt.kl], feed_dict=feed_dict)
+        rc = sess.run([model.reconstructions],feed_dict=feed_dict) 
+        z_mean, z_log_std = sess.run([model.z_mean, model.z_log_std],feed_dict=feed_dict) 
+        import pdb; pdb.set_trace()
+        outs = sess.run([opt.opt_op, opt.cost, opt.kl, opt.rc_loss], feed_dict=feed_dict)
 
         # Compute average loss
         avg_cost = outs[1]
         if epoch % 100 == 0:
-            if not args.autoencoder:
-                print('kl_loss', outs[2])
+            print('kl_loss', outs[2], 'rc_loss', outs[3])
             print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(avg_cost),
               "time=", "{:.5f}".format(time.time() - t))
         if epoch % 1000 == 0 and epoch != 0:

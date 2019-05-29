@@ -54,18 +54,25 @@ class GCNModelAE(Model):
                                               dropout=self.dropout,
                                               logging=self.logging)(self.inputs)
 
+        self.hidden2 = GraphConvolution(batch_size=self.batch_size,
+                                              input_dim=args.hidden_dim_1,
+                                              output_dim=args.hidden_dim_2,
+                                              adj=self.adj,
+                                              act=tf.nn.relu,
+                                              dropout=self.dropout,
+                                              logging=self.logging)(self.hidden1)
+
         self.z_mean = GraphConvolution(batch_size=self.batch_size,
-                                       input_dim=args.hidden_dim_1,
-                                       output_dim=args.hidden_dim_2,
+                                       input_dim=args.hidden_dim_2,
+                                       output_dim=args.hidden_dim_3,
                                        adj=self.adj,
                                        act=lambda x: x,
                                        dropout=self.dropout,
-                                       logging=self.logging)(self.hidden1)
-        self.z = self.z_mean 
+                                       logging=self.logging)(self.hidden2)
 
-        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
-                                      act=lambda x: x,
-                                      logging=self.logging)(self.z)
+        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_3,
+                                      act= tf.nn.tanh,
+                                      logging=self.logging)(self.z_mean)
 
 class GCNModelVAE(Model):
     def __init__(self, placeholders, num_features, num_nodes, args, **kwargs):
@@ -87,70 +94,33 @@ class GCNModelVAE(Model):
                                               act=tf.nn.relu,
                                               dropout=self.dropout,
                                               logging=self.logging)(self.inputs)
-
-        self.z_mean = GraphConvolution(batch_size=self.batch_size,
-                                       input_dim=args.hidden_dim_1,
-                                       output_dim=args.hidden_dim_2,
-                                       adj=self.adj,
-                                       act=lambda x: x,
-                                       dropout=self.dropout,
-                                       logging=self.logging)(self.hidden1)
-
-        self.z_log_std = GraphConvolution(batch_size=self.batch_size,
-                                          input_dim=args.hidden_dim_1,
-                                          output_dim=args.hidden_dim_2,
-                                          adj=self.adj,
-                                          act=lambda x: x,
-                                          dropout=self.dropout,
-                                          logging=self.logging)(self.hidden1)
-
-        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2]) * tf.exp(tf.clip_by_value(self.z_log_std, float("-inf"), 5.))
-#         self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2])
-
-        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
-                                      act=lambda x: x,
-                                      logging=self.logging)(self.z)
-
-class GCNModelVAE(Model):
-    def __init__(self, placeholders, num_features, num_nodes, args, **kwargs):
-        super(GCNModelVAE, self).__init__(**kwargs)
-
-        self.inputs = placeholders['features']
-        self.batch_size = args.batch_size
-        self.input_dim = num_features
-        self.n_samples = num_nodes
-        self.adj = placeholders['adj_orig']
-        self.dropout = placeholders['dropout']
-        self.build(args)
-
-    def _build(self, args):
-        self.hidden1 = GraphConvolution(batch_size=self.batch_size,
-                                              input_dim=self.input_dim,
-                                              output_dim=args.hidden_dim_1,
+        
+        self.hidden2 = GraphConvolution(batch_size=self.batch_size,
+                                              input_dim=args.hidden_dim_1,
+                                              output_dim=args.hidden_dim_2,
                                               adj=self.adj,
                                               act=tf.nn.relu,
                                               dropout=self.dropout,
-                                              logging=self.logging)(self.inputs)
+                                              logging=self.logging)(self.hidden1)
 
         self.z_mean = GraphConvolution(batch_size=self.batch_size,
-                                       input_dim=args.hidden_dim_1,
-                                       output_dim=args.hidden_dim_2,
+                                       input_dim=args.hidden_dim_2,
+                                       output_dim=args.hidden_dim_3,
                                        adj=self.adj,
                                        act=lambda x: x,
                                        dropout=self.dropout,
-                                       logging=self.logging)(self.hidden1)
+                                       logging=self.logging)(self.hidden2)
 
         self.z_log_std = GraphConvolution(batch_size=self.batch_size,
-                                          input_dim=args.hidden_dim_1,
-                                          output_dim=args.hidden_dim_2,
+                                          input_dim=args.hidden_dim_2,
+                                          output_dim=args.hidden_dim_3,
                                           adj=self.adj,
                                           act=lambda x: x,
                                           dropout=self.dropout,
-                                          logging=self.logging)(self.hidden1)
+                                          logging=self.logging)(self.hidden2)
 
-        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2]) * tf.exp(tf.clip_by_value(self.z_log_std, float("-inf"), 5.))
-#         self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2])
+        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_3]) * tf.exp(self.z_log_std)
 
-        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
-                                      act=lambda x: x,
+        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_3,
+                                      act=tf.nn.tanh,
                                       logging=self.logging)(self.z)
