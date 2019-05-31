@@ -29,6 +29,7 @@ parser.add_argument('--debug', help='turn on tf debugger', action="store_true")
 parser.add_argument('--autoencoder', help='train without KL loss', action="store_true")
 parser.add_argument('--restore', help='restore or train new model', action="store_true")
 parser.add_argument('--activation', help='activation function on decoder output', default='none')
+parser.add_argument('--lambd', help='lagrange multiplier on constraint (MSE)', default=1.0)
 
 args = parser.parse_args()
 print("Learning Rate: " + str(args.learning_rate))
@@ -80,7 +81,7 @@ with tf.name_scope('optimizer'):
                            labels=tf.reshape(placeholders['adj_orig'], [-1]),
                            model=model, num_nodes=num_nodes,
                            learning_rate=args.learning_rate,
-                           kl_coefficient=args.kl_coefficient)
+                           lambd=args.lambd, alpha=0.99, tolerance=0.009)
 
 def get_next_batch(batch_size, adj, adj_norm):
     adj_idx = np.random.randint(adj.shape[0], size=batch_size)
@@ -118,7 +119,8 @@ with session as sess:
         adj_norm_batch, adj_orig_batch, adj_idx = get_next_batch(args.batch_size, adj, adj_norm)
         feed_dict = construct_feed_dict(adj_norm_batch, adj_orig_batch, features_batch, placeholders)
         feed_dict.update({placeholders['dropout']: args.dropout})
-        outs = sess.run([opt.opt_op, opt.cost, opt.kl, opt.rc_loss], feed_dict=feed_dict)
+        outs = sess.run([opt.opt_op, opt.cost, opt.kl, opt.rc_loss, opt.lambd], feed_dict=feed_dict)
+        opt.update_lambd()
 
         # Compute average loss
         avg_cost = outs[1]
