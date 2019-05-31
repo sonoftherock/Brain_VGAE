@@ -1,6 +1,7 @@
 from layers import GraphConvolution, InnerProductDecoder
 import tensorflow as tf
 import math
+from preprocess import normalize_adj_tf
 
 class Model(object):
     def __init__(self, **kwargs):
@@ -54,23 +55,15 @@ class GCNModelAE(Model):
                                               dropout=self.dropout,
                                               logging=self.logging)(self.inputs)
 
-        self.hidden2 = GraphConvolution(batch_size=self.batch_size,
-                                              input_dim=args.hidden_dim_1,
-                                              output_dim=args.hidden_dim_2,
-                                              adj=self.adj,
-                                              act=tf.nn.relu,
-                                              dropout=self.dropout,
-                                              logging=self.logging)(self.hidden1)
-
         self.z_mean = GraphConvolution(batch_size=self.batch_size,
-                                       input_dim=args.hidden_dim_2,
-                                       output_dim=args.hidden_dim_3,
+                                       input_dim=args.hidden_dim_1,
+                                       output_dim=args.hidden_dim_2,
                                        adj=self.adj,
                                        act=lambda x: x,
                                        dropout=self.dropout,
-                                       logging=self.logging)(self.hidden2)
+                                       logging=self.logging)(self.hidden1)
 
-        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_3,
+        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
                                       act= tf.nn.tanh,
                                       logging=self.logging)(self.z_mean)
 
@@ -95,32 +88,24 @@ class GCNModelVAE(Model):
                                               dropout=self.dropout,
                                               logging=self.logging)(self.inputs)
         
-        self.hidden2 = GraphConvolution(batch_size=self.batch_size,
-                                              input_dim=args.hidden_dim_1,
-                                              output_dim=args.hidden_dim_2,
-                                              adj=self.adj,
-                                              act=tf.nn.relu,
-                                              dropout=self.dropout,
-                                              logging=self.logging)(self.hidden1)
-
         self.z_mean = GraphConvolution(batch_size=self.batch_size,
-                                       input_dim=args.hidden_dim_2,
-                                       output_dim=args.hidden_dim_3,
+                                       input_dim=args.hidden_dim_1,
+                                       output_dim=args.hidden_dim_2,
                                        adj=self.adj,
                                        act=lambda x: x,
                                        dropout=self.dropout,
-                                       logging=self.logging)(self.hidden2)
+                                       logging=self.logging)(self.hidden1)
 
         self.z_log_std = GraphConvolution(batch_size=self.batch_size,
-                                          input_dim=args.hidden_dim_2,
-                                          output_dim=args.hidden_dim_3,
+                                          input_dim=args.hidden_dim_1,
+                                          output_dim=args.hidden_dim_2,
                                           adj=self.adj,
                                           act=lambda x: x,
                                           dropout=self.dropout,
-                                          logging=self.logging)(self.hidden2)
+                                          logging=self.logging)(self.hidden1)
 
-        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_3]) * tf.exp(self.z_log_std)
+        self.z = self.z_mean + tf.random_normal([self.n_samples, args.hidden_dim_2], dtype=tf.float64) * tf.exp(self.z_log_std)
 
-        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_3,
+        self.reconstructions = InnerProductDecoder(input_dim=args.hidden_dim_2,
                                       act=tf.nn.tanh,
                                       logging=self.logging)(self.z)

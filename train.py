@@ -20,9 +20,9 @@ parser.add_argument("data_dir", nargs='?', help="data directory", type=str, defa
 parser.add_argument("learning_rate", nargs='?', type=float, default=0.0001)
 parser.add_argument("epochs", nargs='?', type=int, default=1000000)
 parser.add_argument("batch_size", nargs='?', type=int, default=32)
-parser.add_argument("hidden_dim_1", nargs='?', type=int, default=100)
-parser.add_argument("hidden_dim_2", nargs='?', type=int, default=50)
-parser.add_argument("hidden_dim_3", nargs='?', type=int, default=5)
+parser.add_argument("--hidden_dim_1", type=int, default=100)
+parser.add_argument("--hidden_dim_2", type=int, default=50)
+parser.add_argument("--hidden_dim_3", type=int, default=5)
 parser.add_argument("--kl_coefficient", type=float, default=0.001)
 parser.add_argument("dropout", nargs='?', type=float, default=0.)
 parser.add_argument('--debug', help='turn on tf debugger', action="store_true")
@@ -57,7 +57,7 @@ placeholders = {
 'features': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_features]),
 'adj_norm': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
 'adj_orig': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
-'dropout': tf.placeholder_with_default(0., shape=())
+'dropout': tf.placeholder_with_default(tf.cast(0., tf.float64), shape=())
 }
 
 # Create model
@@ -91,17 +91,17 @@ def get_next_batch(batch_size, adj, adj_norm):
     return adj_norm_batch, adj_orig_batch, adj_idx
 
 # Initialize session
-sess = tf.Session()
+session = tf.Session()
 
 if args.debug:
-    sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+    session = tf_debug.LocalCLIDebugWrapperSession(session)
 
 # Train model
 saver = tf.train.Saver()
 model_name = "./models/brain_vgae_" + str(args.hidden_dim_1) + "_" + str(args.hidden_dim_2) + "_" +str(args.hidden_dim_3) + "_" + "autoencoder=" + str(args.autoencoder) + "_kl_coefficient=" + str(args.kl_coefficient) + ".ckpt"
 print("Starting to train: " + model_name)
 
-with tf.Session() as sess:
+with session as sess:
     sess.run(tf.global_variables_initializer())
     if args.restore:
         print("Restoring model from: ", model_name)
@@ -118,9 +118,6 @@ with tf.Session() as sess:
         adj_norm_batch, adj_orig_batch, adj_idx = get_next_batch(args.batch_size, adj, adj_norm)
         feed_dict = construct_feed_dict(adj_norm_batch, adj_orig_batch, features_batch, placeholders)
         feed_dict.update({placeholders['dropout']: args.dropout})
-        rc = sess.run([model.reconstructions],feed_dict=feed_dict) 
-        z_mean, z_log_std = sess.run([model.z_mean, model.z_log_std],feed_dict=feed_dict) 
-        import pdb; pdb.set_trace()
         outs = sess.run([opt.opt_op, opt.cost, opt.kl, opt.rc_loss], feed_dict=feed_dict)
 
         # Compute average loss

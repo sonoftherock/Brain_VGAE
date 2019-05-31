@@ -10,7 +10,7 @@ import logging
 
 from input_data import load_data
 from optimizer import OptimizerAE, OptimizerVAE
-from model import GCNModelVAE, GCNModelVAE_tanh, GCNModelAE
+from model import GCNModelVAE, GCNModelAE
 from preprocess import normalize_adj, construct_feed_dict
 from utils import visualize_triangular, visualize_matrix, visualize_latent_space, get_random_batch, get_consecutive_batch
 
@@ -18,10 +18,11 @@ from utils import visualize_triangular, visualize_matrix, visualize_latent_space
 class args:
     data_dir = "BSNIP_left_full/"
     hidden_dim_1 = 100
-    hidden_dim_2 = 50
+    hidden_dim_2 = 10
+    hidden_dim_3 = 0
     batch_size = 32
     learning_rate = 0.0001
-    kl_coefficient = 0.0001
+    kl_coefficient = 0.001
     activation='tanh'
     dropout = 0.
 
@@ -41,21 +42,21 @@ num_features = adj.shape[1]
     
 # Define placeholders
 placeholders = {
-'features': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_features]),
-'adj_norm': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
-'adj_orig': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
-'dropout': tf.placeholder_with_default(0., shape=())
+'features': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_features]),
+'adj_norm': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
+'adj_orig': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
+'dropout': tf.placeholder_with_default(tf.cast(0., tf.float64), shape=())
 }
 
 # Create model
-model = GCNModelVAE_tanh(placeholders, num_features, num_nodes, args)
+model = GCNModelVAE(placeholders, num_features, num_nodes, args)
 
 # Initialize session
 sess = tf.Session()
 
 # Train model
 saver = tf.train.Saver()
-model_name = "./models/brain_vgae_100_50_autoencoder=False_kl_coefficient=0.001_act=tanh.ckpt"
+model_name = "./models/brain_vgae_100_10_0_autoencoder=False_kl_coefficient=0.001.ckpt"
 print("Analyzing " + model_name)
 
 with tf.Session() as sess:
@@ -73,22 +74,24 @@ with tf.Session() as sess:
     
     reconstructions = outs[0].reshape([args.batch_size, 180, 180])
     z_mean = outs[1]
-    # Visualize sample full matrix of original, normalized, and reconstructed batches. 
-   # for i in range(adj_orig_batch.shape[0]):
-   #     visualize_matrix(adj_orig_batch, i, model_name, 'original_' + str(i))
-   #     visualize_matrix(adj_norm_batch, i, model_name, 'normalized_' + str(i))
-   #     visualize_matrix(reconstructions, i, model_name, 'reconstruction_' + str(i))
-
-    adj_norm_batch, adj_orig_batch, adj_idx = get_random_batch(args.batch_size, adj, adj_norm)
-    features = features_batch
-    feed_dict = construct_feed_dict(adj_norm_batch, adj_orig_batch, features, placeholders)
-    feed_dict.update({placeholders['dropout']: args.dropout})
-    outs = sess.run([model.reconstructions, model.z_mean], feed_dict=feed_dict)
+# #     Visualize sample full matrix of original, normalized, and reconstructed batches. 
+#     for i in range(adj_orig_batch.shape[0]):
+#         visualize_matrix(adj_orig_batch, i, model_name, 'original_' + str(i))
+#         visualize_matrix(adj_norm_batch, i, model_name, 'normalized_' + str(i))
+#         visualize_matrix(reconstructions, i, model_name, 'reconstruction_' + str(i))
+        
+    idx_all, z_all = [], []
+    for i in range(10):
+        adj_norm_batch, adj_orig_batch, adj_idx = get_random_batch(args.batch_size, adj, adj_norm)
+        features = features_batch
+        feed_dict = construct_feed_dict(adj_norm_batch, adj_orig_batch, features, placeholders)
+        feed_dict.update({placeholders['dropout']: args.dropout})
+        outs = sess.run([model.reconstructions, model.z_mean], feed_dict=feed_dict)
+        idx_all.append(adj_idx)
+        z_all.append(outs[1])
     
-    reconstructions = outs[0].reshape([args.batch_size, 180, 180])
-    z_mean = outs[1]
-    
-    # Visualize Latent Space
-    onehot = np.array([0 if idx < 203 else 1 for idx in adj_idx])
-    import pdb; pdb.set_trace()
-    visualize_latent_space(z_mean, onehot, model_name)
+#     Visualize Latent Space
+#     z = np.array(z_all).reshape(-1, 10)
+#     idx = np.array(idx_all).flatten()
+    onehot = np.array([0 if i < 203 else 1 for i in idx_all[0]])
+    visualize_latent_space(z_all[0], onehot, model_name)

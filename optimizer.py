@@ -10,8 +10,8 @@ class OptimizerVAE(object):
         self.optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)  # Adam Optimizer
 
         # Latent loss
-        self.kl = (0.5 / num_nodes) * tf.reduce_mean(tf.reduce_sum(1 + 2 * model.z_log_std - tf.square(model.z_mean) -
-                                                                   tf.square(tf.exp(model.z_log_std)), 1))
+        self.kl = tf.clip_by_value((0.5 / num_nodes) * tf.reduce_mean(tf.reduce_sum(1 + 2 * model.z_log_std - tf.square(model.z_mean) -
+                                                                   tf.square(tf.exp(model.z_log_std)), 1)), tf.float64.min, tf.float64.max)
         self.cost = self.rc_loss - kl_coefficient * self.kl
 
         self.opt_op = self.optimizer.minimize(self.cost)
@@ -28,7 +28,7 @@ class OptimizerAE(object):
         self.cost = self.rc_loss 
         
         # Just to let train script run, doesn't do anything.
-        self.kl = tf.zeros([1,1])
+        self.kl = tf.zeros([1,1], dtype=tf.float64)
 
         self.opt_op = self.optimizer.minimize(self.cost)
         self.grads_vars = self.optimizer.compute_gradients(self.cost)

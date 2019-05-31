@@ -10,7 +10,7 @@ import argparse
 import logging
 from input_data import load_data
 from optimizer import OptimizerAE, OptimizerVAE
-from model import GCNModelVAE, GCNModelVAE_tanh, GCNModelAE
+from model import GCNModelVAE, GCNModelAE
 from preprocess import normalize_adj, construct_feed_dict
 from utils import visualize_triangular, visualize_matrix, visualize_latent_space, get_consecutive_batch, get_random_batch
 
@@ -18,7 +18,8 @@ from utils import visualize_triangular, visualize_matrix, visualize_latent_space
 class args:
     data_dir = "BSNIP_left_full/"
     hidden_dim_1 = 100
-    hidden_dim_2 = 50
+    hidden_dim_2 = 10
+    hidden_dim_3 = 0
     batch_size = 32
     learning_rate = 0.0001
     dropout = 0.
@@ -40,14 +41,14 @@ num_features = adj.shape[1]
     
 # Define placeholders
 placeholders = {
-'features': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_features]),
-'adj_norm': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
-'adj_orig': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
-'dropout': tf.placeholder_with_default(0., shape=())
+'features': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_features]),
+'adj_norm': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
+'adj_orig': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
+'dropout': tf.placeholder_with_default(tf.cast(0., tf.float64), shape=())
 }
 
 # Create model
-model = GCNModelVAE_tanh(placeholders, num_features, num_nodes, args)
+model = GCNModelVAE(placeholders, num_features, num_nodes, args)
 
 # Optimizer
 with tf.name_scope('optimizer'):
@@ -68,8 +69,7 @@ sess = tf.Session()
 
 # Score model
 saver = tf.train.Saver()
-model_name = "./models/brain_vgae_100_50_autoencoder=False.ckpt"
-model_name = "./models/brain_vgae_100_50_autoencoder=False_kl_coefficient=0.001_act=tanh.ckpt"
+model_name = "./models/brain_vgae_100_10_0_autoencoder=False_kl_coefficient=0.001.ckpt"
 
 with tf.Session() as sess:
     saver.restore(sess, model_name)
@@ -94,6 +94,7 @@ with tf.Session() as sess:
         start += args.batch_size
     avg_rc_loss = tot_rc_loss / math.floor(adj.shape[0]/args.batch_size)
     f = open('./scores/%s.txt' % (model_name[9:]), 'w')
+    print(avg_rc_loss.eval())
     f.write("average reconstruction loss: %f" % avg_rc_loss.eval())
     
     og = np.array(og).reshape(11, 32, -1)

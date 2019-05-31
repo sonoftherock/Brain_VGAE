@@ -19,14 +19,14 @@ def visualize_matrix(batch, idx, model_name, name):
     plt.clf()
 
 def visualize_latent_space(z_mean, labels, model_name):
-    plt.figure(figsize=(14,14))
+    plt.figure(figsize=(28,28))
     # Check first 5 nodes
     for k in range(5):
-        for i in range(5):
-            for j in range(5):
-                plt.subplot(5,5,i+1+j*5)
-                plt.plot(z_mean[labels==0,k,i], z_mean[labels==0,k,j], 'o', label='Control')
-                plt.plot(z_mean[labels==1,k,i], z_mean[labels==1,k,j], 'o', label='Schizophrenic')
+        for i in range(10):
+            for j in range(10):
+                plt.subplot(10,10,i+1+j*10)
+                plt.plot(z_mean[labels==0,k,i], z_mean[labels==0,k,j], 'o', label='Control', alpha=0.5)
+                plt.plot(z_mean[labels==1,k,i], z_mean[labels==1,k,j], 'o', label='Schizophrenic', alpha=0.5)
         plt.legend()        
         plt.savefig('./plots/' + model_name[9:] + "/" + 'latent_space_%i.png' %(k))
         plt.clf()
