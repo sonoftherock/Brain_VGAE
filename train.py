@@ -55,10 +55,10 @@ num_features = adj.shape[1]
 
 # Define placeholders
 placeholders = {
-'features': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_features]),
-'adj_norm': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
-'adj_orig': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
-'dropout': tf.placeholder_with_default(tf.cast(0., tf.float64), shape=())
+'features': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_features]),
+'adj_norm': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
+'adj_orig': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
+'dropout': tf.placeholder_with_default(0., shape=())
 }
 
 # Create model
@@ -99,7 +99,8 @@ if args.debug:
 
 # Train model
 saver = tf.train.Saver()
-model_name = "./models/brain_vgae_" + str(args.hidden_dim_1) + "_" + str(args.hidden_dim_2) + "_" +str(args.hidden_dim_3) + "_" + "autoencoder=" + str(args.autoencoder) + "_kl_coefficient=" + str(args.kl_coefficient) + ".ckpt"
+model_name = "./models/brain_vgae_" + str(args.hidden_dim_1) + "_" + str(
+                args.hidden_dim_2) + "_" +str(args.hidden_dim_3) + "_autoencoder=" + str(args.autoencoder) + "_kl_coefficient=" + str(args.kl_coefficient) + ".ckpt"
 print("Starting to train: " + model_name)
 
 with session as sess:
@@ -110,7 +111,7 @@ with session as sess:
         start_time = time.time()
 
     # feature-less
-    features_batch = np.zeros([args.batch_size, num_nodes, num_features], dtype=np.float64)
+    features_batch = np.zeros([args.batch_size, num_nodes, num_features])
     for i in features_batch:
         np.fill_diagonal(i, 1.)
 

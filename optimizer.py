@@ -31,8 +31,8 @@ class OptimizerVAE(object):
         self.grads_vars = self.optimizer.compute_gradients(self.cost)
 
     def update_lambd(self):
-        self.constraint_ma = self.alpha * self.constraint_ma +
-                            (1 - self.alpha) * self.constraint
+        self.constraint_ma = self.alpha * self.constraint_ma + (1 -
+                                self.alpha) * self.constraint
         self.lambd *= tf.exp(self.constraint_ma)
 
 
@@ -47,7 +47,7 @@ class OptimizerAE(object):
         self.cost = self.rc_loss
 
         # Just to let train script run, doesn't do anything.
-        self.kl = tf.zeros([1,1], dtype=tf.float64)
+        self.kl = tf.zeros([1,1])
 
         self.opt_op = self.optimizer.minimize(self.cost)
         self.grads_vars = self.optimizer.compute_gradients(self.cost)
