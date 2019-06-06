@@ -18,8 +18,8 @@ from utils import visualize_triangular, visualize_matrix, visualize_latent_space
 class args:
     data_dir = "BSNIP_left_full/"
     hidden_dim_1 = 100
-    hidden_dim_2 = 10
-    hidden_dim_3 = 0
+    hidden_dim_2 = 50
+    hidden_dim_3 = 5
     batch_size = 32
     learning_rate = 0.0001
     dropout = 0.
@@ -27,7 +27,7 @@ class args:
     autoencoder = False
 
 # Load data
-adj = load_data("./data/" + args.data_dir + "original.npy")
+adj = load_data("./data/" + args.data_dir + "ignore_negative.npy")
 
 for sub in adj:
     np.fill_diagonal(sub, 1)
@@ -41,39 +41,24 @@ num_features = adj.shape[1]
     
 # Define placeholders
 placeholders = {
-'features': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_features]),
-'adj_norm': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
-'adj_orig': tf.placeholder(tf.float64, [args.batch_size, num_nodes, num_nodes]),
-'dropout': tf.placeholder_with_default(tf.cast(0., tf.float64), shape=())
+'features': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_features]),
+'adj_norm': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
+'adj_orig': tf.placeholder(tf.float32, [args.batch_size, num_nodes, num_nodes]),
+'dropout': tf.placeholder_with_default(tf.cast(0., tf.float32), shape=())
 }
 
 # Create model
 model = GCNModelVAE(placeholders, num_features, num_nodes, args)
 
-# Optimizer
-with tf.name_scope('optimizer'):
-    if args.autoencoder:
-        opt = OptimizerAE(preds=model.reconstructions,
-                           labels=tf.reshape(placeholders['adj_orig'], [-1]),
-                           model=model, num_nodes=num_nodes,
-                           learning_rate=args.learning_rate)
-    else:
-        opt = OptimizerVAE(preds=model.reconstructions,
-                           labels=tf.reshape(placeholders['adj_orig'], [-1]),
-                           model=model, num_nodes=num_nodes,
-                           learning_rate=args.learning_rate,
-                           kl_coefficient=args.kl_coefficient)
-        
 # Initialize session
 sess = tf.Session()
 
 # Score model
 saver = tf.train.Saver()
-model_name = "./models/brain_vgae_100_10_0_autoencoder=False_kl_coefficient=0.001.ckpt"
+model_name = './models/brain_vgae_ignore_negative_100_50_5_autoencoder=False.ckpt'
 
 with tf.Session() as sess:
     saver.restore(sess, model_name)
-
     features_batch = np.zeros([args.batch_size, num_nodes, num_features], dtype=np.float32)
     for i in features_batch:
         np.fill_diagonal(i, 1.)
@@ -87,14 +72,13 @@ with tf.Session() as sess:
         features = features_batch
         feed_dict = construct_feed_dict(adj_norm_batch, adj_orig_batch, features, placeholders)
         feed_dict.update({placeholders['dropout']: args.dropout})
-        outs = sess.run([model.reconstructions, model.z_mean, opt.cost], feed_dict=feed_dict)
+        outs = sess.run([model.reconstructions, model.z_mean], feed_dict=feed_dict)
         
         reconstructions = outs[0].reshape([args.batch_size, 180, 180])
         tot_rc_loss += tf.reduce_mean(tf.square(adj_orig_batch - reconstructions))
         start += args.batch_size
     avg_rc_loss = tot_rc_loss / math.floor(adj.shape[0]/args.batch_size)
     f = open('./scores/%s.txt' % (model_name[9:]), 'w')
-    print(avg_rc_loss.eval())
     f.write("average reconstruction loss: %f" % avg_rc_loss.eval())
     
     og = np.array(og).reshape(11, 32, -1)
@@ -104,7 +88,7 @@ with tf.Session() as sess:
 
     # TODO: Get pearson coefficients of first and second moments (Only for variational models) - make sure latent space is N(0,0.1)?
     for i in range(11):
-        randoms = [np.random.normal(0, 1.0, (num_nodes, args.hidden_dim_2)) for _ in range(args.batch_size)]
+        randoms = [np.random.normal(0, 1.0, (num_nodes, args.hidden_dim_3)) for _ in range(args.batch_size)]
         [gen] = sess.run([model.reconstructions], feed_dict={model.z: randoms})
         gen = gen.reshape(args.batch_size, -1)
         gen_all.append(gen)
@@ -119,6 +103,13 @@ with tf.Session() as sess:
     plt.ylabel('generated')
     plt.savefig('./scores/%s_mean.png'%(model_name[9:]))
     plt.clf()
+    plt.scatter(og_var, gen_var)
+    plt.title('Feature Variance')
+    plt.xlabel('original')
+    plt.ylabel('generated')
+    plt.savefig('./scores/%s_variance.png'%(model_name[9:]))
+    plt.clf()
+    f
     f.write("Feature mean (180 * 180 features): " + str(sp.pearsonr(og_mean, gen_mean)))
     f.write("Feature Variance (180*180 features): " + str(sp.pearsonr(og_var, gen_var)))
 
